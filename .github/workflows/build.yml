@@ -40,8 +40,9 @@ jobs:
             ghcr.io/${{ github.repository }}:latest
 
       # The Dockerfile already fails the build if the patch does not apply.
-      # This step independently confirms the pushed image carries the patch.
-      - name: Verify Mobile Edit patch in built image
+      # This step independently confirms the pushed image carries the patch
+      # and the AI Tools plugin.
+      - name: Verify Mobile Edit patch and AI plugin in built image
         run: |
           docker run --rm --entrypoint /bin/sh "ghcr.io/${{ github.repository }}:${{ env.VERSION }}" -c '
             set -e
@@ -52,4 +53,16 @@ jobs:
                 echo "PATCH MISSING in $f"
                 exit 1
               fi
-            done'
+            done
+            if grep -q "asc.{9DC93CDB-B576-4F0C-B55E-FCC9C48DD007}" /var/www/onlyoffice/documentserver/sdkjs-plugins/ai/config.json; then
+              echo "OK: AI Tools plugin config"
+            else
+              echo "AI PLUGIN MISSING"
+              exit 1
+            fi
+            if grep -q "version.*3\.2\.2" /var/www/onlyoffice/documentserver/sdkjs-plugins/ai/config.json; then
+              echo "OK: AI Tools plugin 3.2.2"
+            else
+              echo "AI PLUGIN VERSION MISMATCH"
+              exit 1
+            fi'
