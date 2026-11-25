@@ -1,7 +1,7 @@
 # onlyoffice-documentserver-unlimited
 
-Unofficial OnlyOffice DocumentServer image with **Mobile Edit enabled**,
-based on the official image.
+Unofficial OnlyOffice DocumentServer image with **Mobile Edit enabled** and
+the **AI Tools plugin** pre-installed, based on the official image.
 
 ## Why
 
@@ -21,6 +21,22 @@ This image is a thin layer on top of the official image: it flips that flag to
 - `ghcr.io/zetzzzz/onlyoffice-documentserver-unlimited:latest` (currently 10.0.0.1)
 
 Built automatically by GitHub Actions on every push to `main`.
+
+## AI Tools
+
+The 10.0 open-source image ships without AI Tools, and the Plugin Manager
+catalog does not list the plugin, so this image bakes in the official AI
+plugin **v3.2.2** (`ONLYOFFICE/onlyoffice.github.io`,
+`sdkjs-plugins/content/ai`, AGPL-3.0; GUID
+`asc.{9DC93CDB-B576-4F0C-B55E-FCC9C48DD007}`). After deploying, the
+**AI Tools** tab appears in every editor and the plugin shows up under
+Plugins → Background plugins.
+
+Each user connects their own AI provider: AI Tools tab → Settings →
+Add Model → provider **OpenAI Compatible** → base URL + API key → pick a
+model. Any OpenAI-compatible endpoint works, including a self-hosted one.
+Note the plugin calls the provider from the browser, so the provider's
+endpoint must allow the Document Server origin (CORS preflight).
 
 ## Use
 
@@ -45,14 +61,17 @@ the server URL, with the same JWT secret.
 
 ## Verify
 
-The Docker build itself fails if the Mobile Edit patch does not apply, and the
-workflow runs an extra check against the pushed image:
+The Docker build itself fails if the Mobile Edit patch does not apply or if
+the AI plugin download fails its checksum / GUID check, and the workflow runs
+an extra check against the pushed image:
 
 ```sh
 docker run --rm --entrypoint /bin/sh \
   ghcr.io/zetzzzz/onlyoffice-documentserver-unlimited:10.0.0.1 \
   -c 'grep -o "isSupportEditFeature=()=>1" \
-  /var/www/onlyoffice/documentserver/web-apps/apps/*/mobile/dist/js/app.js'
+  /var/www/onlyoffice/documentserver/web-apps/apps/*/mobile/dist/js/app.js;
+  grep "asc.{9DC93CDB-B576-4F0C-B55E-FCC9C48DD007}" \
+  /var/www/onlyoffice/documentserver/sdkjs-plugins/ai/config.json'
 ```
 
 ## Update to a newer upstream version
@@ -66,5 +85,3 @@ docker run --rm --entrypoint /bin/sh \
 - Unofficial build, not affiliated with ONLYOFFICE or thomisus.
 - DocumentServer itself is licensed AGPL-3.0; this repository only adds a
   small Dockerfile, workflow and README on top of the official image.
-- AI Tools (new in 10.0) are not included in the open-source build; they are
-  installed separately upstream.
