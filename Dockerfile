@@ -1,4 +1,4 @@
-# OnlyOffice DocumentServer 10.0.0.1 with Mobile Edit enabled.
+# OnlyOffice DocumentServer 10.0.0.1 with Mobile Edit enabled + AI Tools plugin.
 # Unofficial build: a thin layer on top of the official image.
 #
 # Why this exists:
@@ -7,11 +7,14 @@
 #   cannot be bumped to newer versions.
 # - The official 9.4+ builds already removed the 20-connection limit,
 #   so the only remaining feature of the "unlimited" fork is Mobile Edit.
-# - This image takes the official 10.0.0.1 image and flips the Mobile Edit
-#   flag in the mobile web-apps, nothing else.
+# - This image takes the official 10.0.0.1 image, flips the Mobile Edit
+#   flag in the mobile web-apps, and bakes in the AI Tools plugin
+#   (which the 10.0 open-source image ships without, and which the
+#   Plugin Manager catalog does not list).
 #
-# The build FAILS if the patch does not apply, so a silent no-op
-# (e.g. upstream renamed the flag) can never ship.
+# The build FAILS if a patch does not apply or a checksum does not match,
+# so a silent no-op (e.g. upstream renamed the flag, or the plugin
+# download changed) can never ship.
 FROM onlyoffice/documentserver:10.0.0.1
 
 # Mobile editors ship with EditorUIController.isSupportEditFeature = () => false,
@@ -35,3 +38,25 @@ RUN set -eux; \
     done; \
     [ "$patched" -ge 3 ] || { echo "ERROR: only $patched mobile editor(s) patched, expected at least 3" >&2; exit 1; }; \
     echo "Mobile Edit enabled in $patched editor(s)"
+
+# AI Tools plugin v3.2.2 (official plugin, ONLYOFFICE/onlyoffice.github.io,
+# sdkjs-plugins/content/ai, AGPL-3.0). The 10.0 open-source image ships
+# without it and the Plugin Manager catalog does not list it, so it is
+# installed here into sdkjs-plugins/, where DocumentServer picks up
+# bundled plugins for all users.
+# Verified 2026-11-25: ai.plugin, 2,205,374 bytes,
+# SHA256 5e98cc51659cdf3fd0edcdf076137893575f4840a5fa6dcb2f460f93c8669c43,
+# config.json guid asc.{9DC93CDB-B576-4F0C-B55E-FCC9C48DD007}, version 3.2.2.
+ADD https://raw.githubusercontent.com/ONLYOFFICE/onlyoffice.github.io/master/sdkjs-plugins/content/ai/deploy/ai.plugin /tmp/ai.plugin
+RUN set -eux; \
+    echo "5e98cc51659cdf3fd0edcdf076137893575f4840a5fa6dcb2f460f93c8669c43  /tmp/ai.plugin" | sha256sum -c -; \
+    mkdir -p /var/www/onlyoffice/documentserver/sdkjs-plugins/ai; \
+    if command -v unzip >/dev/null 2>&1; then \
+        unzip -o -q /tmp/ai.plugin -d /var/www/onlyoffice/documentserver/sdkjs-plugins/ai; \
+    else \
+        python3 -c "import zipfile; zipfile.ZipFile('/tmp/ai.plugin').extractall('/var/www/onlyoffice/documentserver/sdkjs-plugins/ai')"; \
+    fi; \
+    rm /tmp/ai.plugin; \
+    grep -q 'asc.{9DC93CDB-B576-4F0C-B55E-FCC9C48DD007}' /var/www/onlyoffice/documentserver/sdkjs-plugins/ai/config.json; \
+    grep -q '"version": "3.2.2"' /var/www/onlyoffice/documentserver/sdkjs-plugins/ai/config.json; \
+    echo "AI Tools plugin 3.2.2 installed"
